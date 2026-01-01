@@ -17,7 +17,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm' # Automatically caches dependencies
+          cache: 'npm'
+          # This line fixes the "Dependencies lock file is not found" error
+          cache-dependency-path: package.json
 
       - name: Setup Expo
         uses: expo/expo-github-action@v8
@@ -29,14 +31,14 @@ jobs:
         run: npm install
 
       - name: Build APK with EAS
-        # Removed --no-wait so the runner waits for the cloud build to finish
+        # We wait for the cloud build to finish so the file exists for download
         run: eas build --platform android --profile preview --non-interactive
 
       - name: Download APK
-        # This will now download the build that just finished
         run: |
-          eas build:list --platform android --status finished --limit 1 --json > build.json
-          BUILD_URL=$(jq -r '.[0].artifacts.buildUrl' build.json)
+          # Grabs the URL of the most recent finished preview build
+          BUILD_URL=$(eas build:list --platform android --profile preview --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+          if [ "$BUILD_URL" = "null" ]; then echo "Build URL not found"; exit 1; f
           curl -L $BUILD_URL -o jarvis.apk
 
       - name: Upload APK artifact
